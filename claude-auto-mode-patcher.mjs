@@ -132,6 +132,12 @@ const VERSION_PATCHES = {
       replace: '/^claude-(opus|sonnet)-4-6/.test(K)}return!0}',
     },
     {
+      id: 'model-return',
+      desc: 'modelSupportsAutoMode — regex return always true',
+      search:  'return/^claude-(opus|sonnet)-4-6/.test(K)',
+      replace: 'return!0                                 ',
+    },
+    {
       id: 'gate-enabled',
       desc: 'isAutoModeGateEnabled — always return true',
       search:  'function DL(){if(Lf?.isAutoModeCircuitBroken()??!1)return!1;if(fY7())return!1;if(!Nk6(M5()))return!1;return!0}',

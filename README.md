@@ -141,20 +141,23 @@ npm run claude -- chat
 
 ### 原理
 
-Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件（Windows 为 npm 安装的 `cli.js`），JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改 6 个权限检查函数：
+Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件（Windows 为 npm 安装的 `cli.js`），JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改 7 个权限检查函数：
 
 | # | 目标 | 效果 |
 |---|------|------|
 | 1 | `modelSupportsAutoMode` — provider 检查 | 绕过 firstParty/anthropicAws 限制 |
-| 2 | `modelSupportsAutoMode` — model 正则 | 绕过 claude-opus/sonnet-4-6 模型名限制 |
-| 3 | `isAutoModeGateEnabled` | 始终返回 `true` |
-| 4 | `isAutoModeCircuitBroken` | 始终返回 `false` |
-| 5 | `verifyAutoModeGateAccess` | 强制走 happy path |
-| 6 | `carouselAvailable` | 始终为 `true`（Shift+Tab 可切换） |
+| 2 | `modelSupportsAutoMode` — model 正则（外层返回值） | 修改函数尾部 `return!1` → `return!0` |
+| 3 | `modelSupportsAutoMode` — model 正则（内层返回值） | `return regex.test(K)` → `return!0`，确保非 Claude 模型通过 |
+| 4 | `isAutoModeGateEnabled` | 始终返回 `true` |
+| 5 | `isAutoModeCircuitBroken` | 始终返回 `false` |
+| 6 | `verifyAutoModeGateAccess` | 强制走 happy path |
+| 7 | `carouselAvailable` | 始终为 `true`（Shift+Tab 可切换） |
+
+> **v2.1.105 新增 `model-return` 补丁**：早期版本仅修改了 `modelSupportsAutoMode` 函数外层的 `return!1`，但内层的 `return/^claude-(opus|sonnet)-4-6/.test(K)` 会先执行并直接返回结果，导致外层修改永远不会生效。非 Claude 模型（如 glm-5.1）因此被误拒。新增的 `model-return` 补丁直接将内层正则返回替换为 `return!0`，从根源解决了此问题。
 
 ### 版本差异示例
 
-每个版本的 6 个补丁点结构相同，仅混淆变量名不同。以 gate-enabled 补丁为例：
+每个版本的 7 个补丁点结构相同，仅混淆变量名不同。以 gate-enabled 补丁为例：
 
 ```javascript
 // v2.1.92
@@ -242,7 +245,7 @@ node claude-auto-mode-patcher.mjs --restore
 ### 步骤
 
 1. 安装新版本 Claude Code
-2. 在目标文件中搜索 6 个补丁点的混淆变量名
+2. 在目标文件中搜索 7 个补丁点的混淆变量名
 3. 在 `VERSION_PATCHES` 中添加新版本条目
 
 ### 搜索命令
@@ -255,8 +258,11 @@ CLI="node_modules/@anthropic-ai/claude-code/cli.js"  # Windows npm
 # 1. provider 检查
 grep -oP 'if\([A-Za-z0-9_]+!=="firstParty"&&[A-Za-z0-9_]+!=="anthropicAws"\)return!1' "$CLI"
 
-# 2. model 正则
+# 2. model 正则（外层返回值）
 grep -oP 'claude-\(opus\|sonnet\)-4-6/\.test\([A-Za-z0-9_]+\)\}return!1\}' "$CLI"
+
+# 2.5 model 正则（内层返回值）— v2.1.105+ 新增
+grep -oP 'return/\^claude-\(opus\|sonnet\)-4-6/\.test\([A-Za-z0-9_]+\)' "$CLI"
 
 # 3. gate 函数
 grep -oP 'function [a-zA-Z0-9_]+\(\)\{if\([a-zA-Z0-9_]+\?\.isAutoModeCircuitBroken\(\)\?\?!1\)return!1;if\([a-zA-Z0-9_]+\(\)\)return!1;if\(![a-zA-Z0-9_]+\([a-zA-Z0-9_]+\(\)\)\)return!1;return!0\}' "$CLI"
