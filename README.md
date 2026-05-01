@@ -1,17 +1,59 @@
 # Claude Code Unlocker
 
-解除 Claude Code CLI 的功能限制，使**所有 API 代理和模型**都能使用全部功能。
-
-支持 OpenRouter、bigmodel.cn、AWS Bedrock、自建 Anthropic 兼容 API 等第三方代理。
+解除 Claude Code CLI 的相关功能限制，解锁 auto 模式~~和 API 接入情况下 buddy 互动功能~~。
 
 本项目包含两个独立的补丁工具：
 
 - **`claude-auto-mode-patcher.mjs`** — 解锁 auto 模式，无需逐条确认权限，自动执行。
-- **`claude-buddy-patcher.mjs`** — 解锁 buddy 互动功能，小伙伴用你配置的 haiku 模型发表评论。
+- ~~**`claude-buddy-patcher.mjs`** — 解锁 buddy 互动功能，小伙伴用你配置的 haiku 模型发表评论。（**buddy 仅为 claude 愚人节限定活动而已，新版本已剔除**）~~
+
+---
+
+> ## 🔥 无需补丁开启 Auto 模式（推荐）
+>
+> **[Claude Code 官方文档](https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode)表明：通过 API 使用 Sonnet 4.6, Opus 4.6, or Opus 4.7 等就可以开启 auto 模式。**
+>
+> 所以基本上直接指定 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN` 两个环境变量即可使用 auto 模式，当然前提是，你所使用的 API 支持 model 设置为 claude-sonnet-4-6，经过测试 deepseek/glm 都支持将 sonnet 映射到自己的模型中，其他厂商有待测试。
+>
+> ### 方式一：直接指定环境变量
+>
+> ```bash
+> # DeepSeek — 不指定时默认模型为 deepseek-v4-flash
+> export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+> export ANTHROPIC_AUTH_TOKEN=your-deepseek-api-key
+> 
+> # 智谱 GLM — 不指定时默认模型为 glm-4.7
+> export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+> export ANTHROPIC_AUTH_TOKEN=your-glm-api-key
+> ```
+>
+> ⚠️ **注意：** 此方法仅适用于 Anthropic 兼容的 API 端点（DeepSeek、GLM 等），且要求后端能接受 Claude 模型名，而且不支持指定模型比如 `deepseek-v4-pro` 和 `glm-5.1`。我们推荐使用下方的方式。
+>
+> ### 方式二：使用 [claude-custom-router](https://github.com/zzturn/claude-custom-router)（推荐）
+>
+> 这个项目最初是为了做**多 API 负载均衡**，但意外发现它天然解决了 auto 模式解锁问题——因为它作为本地代理转发请求，Claude Code 感知到的模型名始终是 Claude 系列，自动通过所有门控。
+> 
+> 除了 auto 模式解锁，它还提供：
+> - **多 API 源负载均衡** — 在 DeepSeek、GLM、Anthropic 之间自动切换
+>- **故障自动转移** — 单个 API 挂了自动切到下一个
+> - **统一配置管理** — 不用每次切换环境变量
+> 
+> 详见 👉 [zzturn/claude-custom-router](https://github.com/zzturn/claude-custom-router)
+> 
+> ---
+> 
+> 通过上述任一方式设置后直接使用，无需运行任何补丁脚本，且长期有效：
+> 
+>```bash
+> claude --permission-mode auto
+>```
+> 
+
+---
 
 ## 环境要求
 
-- **Claude Code CLI**（精确匹配已支持版本）
+- **Claude Code CLI**（环境变量方式跨版本通用；补丁脚本需精确匹配已支持版本）
 - Node.js 18+
 - **Windows / macOS / Linux**
 
@@ -28,6 +70,10 @@
 **版本匹配策略**：精确匹配，不支持回退。每个版本的混淆变量名不同，补丁无法跨版本复用。不支持的版本会直接报错。
 
 ## 快速开始
+
+**推荐：** 使用上方环境变量方式，无需运行补丁。
+
+**备选：** 使用补丁脚本（仅 v2.1.96 macOS Bun 二进制）：
 
 ```bash
 git clone https://github.com/zzturn/claude-auto-mode-unlock.git
@@ -65,79 +111,6 @@ set CLAUDE_BIN=C:\path\to\cli.js && node claude-auto-mode-patcher.mjs  # Windows
 ```bash
 claude --permission-mode auto    # 启动时启用
 # 或在会话中按 Shift+Tab 切换
-```
-
-### 别名配置（推荐）
-
-补丁后每次启动都需要加 `--permission-mode auto` 参数。可以通过别名简化操作：
-
-#### Windows（npm 全局安装）
-
-在 PowerShell 中创建持久别名：
-
-```powershell
-# 添加到 $PROFILE 文件，每次启动 PowerShell 自动生效
-Add-Content $PROFILE 'function claude-auto { claude --permission-mode auto @args }'
-# 重新加载配置
-. $PROFILE
-
-# 使用
-claude-auto          # 等同于 claude --permission-mode auto
-claude-auto chat     # 等同于 claude --permission-mode auto chat
-```
-
-或者使用 CMD 的 `doskey`（仅当前会话有效）：
-
-```cmd
-doskey claude-auto=claude --permission-mode auto $*
-```
-
-#### Windows（Volta 管理安装）
-
-Volta 安装的 `claude` 命令路径不同，需要确保 shim 正常工作：
-
-```powershell
-# 确认 volta 能找到 claude
-volta which claude
-
-# 同样添加 PowerShell 函数到 $PROFILE
-Add-Content $PROFILE 'function claude-auto { claude --permission-mode auto @args }'
-. $PROFILE
-
-# 使用
-claude-auto
-```
-
-> 如果 Volta shim 丢失，重新链接：`volta pin claude` 或 `npm install -g @anthropic-ai/claude-code`
-
-#### Linux / macOS（Bash）
-
-```bash
-# 添加到 ~/.bashrc 或 ~/.zshrc
-echo 'alias claude-auto="claude --permission-mode auto"' >> ~/.bashrc
-source ~/.bashrc
-
-# 使用
-claude-auto
-claude-auto --model claude-sonnet-4-6-20250514
-```
-
-#### 跨平台通用（npm script）
-
-在项目 `package.json` 中添加：
-
-```json
-{
-  "scripts": {
-    "claude": "claude --permission-mode auto"
-  }
-}
-```
-
-```bash
-npm run claude
-# 带参数
-npm run claude -- chat
 ```
 
 ### 原理
@@ -282,8 +255,10 @@ grep -oP '[A-Za-z0-9_]+=!1;if\([A-Za-z0-9_]+!=="disabled"&&[^;]+' "$CLI" | grep 
 
 ## 注意事项
 
-- **版本必须精确匹配**：每个版本的混淆变量名不同，不支持跨版本回退
-- **升级后需重新打补丁**：Claude Code 更新会替换文件，需重新运行脚本
+- **推荐使用环境变量方式**：设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 即可开启 auto 模式，无需补丁，跨版本通用
+- **补丁版本必须精确匹配**：每个版本的混淆变量名不同，不支持跨版本回退
+- **补丁跨平台不通用**：macOS 和 Linux 的 Bun 编译二进制混淆名不同（即使同版本号），需要分别提取模式
+- **升级后需重新打补丁**：Claude Code 更新会替换文件，需重新运行脚本（环境变量方式不受此影响）
 - **auto 模式安全分类器仍生效**：仅解除入口限制，`classifyYoloAction` 仍会评估安全性
 
 ## 常见问题
@@ -297,7 +272,7 @@ grep -oP '[A-Za-z0-9_]+=!1;if\([A-Za-z0-9_]+!=="disabled"&&[^;]+' "$CLI" | grep 
 <details>
 <summary>脚本显示 "SKIP" 或 "No patches applied"</summary>
 
-二进制可能已被补丁（运行 `--check` 查看），或版本不在支持列表中。
+二进制可能已被补丁（运行 `--check` 查看），或版本不在支持列表中。推荐改用环境变量方式（设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514`），无需补丁。
 </details>
 
 <details>
@@ -330,7 +305,6 @@ codesign --force --sign - "$(node -e 'console.log(require("fs").realpathSync(pro
 
 <details>
 <summary>Buddy 不说话？</summary>
-
 反应有 30 秒冷却，需要足够对话上下文。叫它名字或 `/buddy pet` 可触发。
 </details>
 
