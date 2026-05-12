@@ -66,9 +66,14 @@
 | v2.1.104 | Windows | 已验证 |
 | v2.1.105 | Windows | 已验证 |
 | v2.1.109 | Windows | 已验证 |
+| v2.1.133 | Linux | 已验证 |
+| v2.1.137 | Linux | 已验证 |
+| v2.1.138 | Linux | 已验证 |
 | v2.1.139 | Linux | 已验证 |
 
 **版本匹配策略**：精确匹配，不支持回退。每个版本的混淆变量名不同，补丁无法跨版本复用。不支持的版本会直接报错。
+
+> **跨平台说明**：各平台（Windows/macOS/Linux）的 Bun 编译二进制混淆变量名不同，即使版本号相同也无法互用补丁。
 
 ## 快速开始
 
@@ -104,7 +109,7 @@ node claude-auto-mode-patcher.mjs --restore
 
 # 手动指定路径
 CLAUDE_BIN=/path/to/claude node claude-auto-mode-patcher.mjs   # macOS/Linux
-set CLAUDE_BIN=C:\path\to\cli.js && node claude-auto-mode-patcher.mjs  # Windows
+set CLAUDE_BIN=C:\path\to\claude && node claude-auto-mode-patcher.mjs  # Windows
 ```
 
 ### 使用
@@ -116,7 +121,7 @@ claude --permission-mode auto    # 启动时启用
 
 ### 原理
 
-Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件（Windows 为 npm 安装的 `cli.js`），JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改 7 个权限检查函数：
+Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件，JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改 7 个权限检查函数：
 
 | # | 目标 | 效果 |
 |---|------|------|
@@ -229,7 +234,7 @@ node claude-auto-mode-patcher.mjs --restore
 
 ```bash
 # 设置目标文件路径
-CLI="node_modules/@anthropic-ai/claude-code/cli.js"  # Windows npm
+CLI="node_modules/@anthropic-ai/claude-code/cli.js"  # Windows npm (旧版)
 # CLI="$(readlink -f ~/.local/bin/claude)"            # macOS
 
 # 1. provider 检查
@@ -258,9 +263,9 @@ grep -oP '[A-Za-z0-9_]+=!1;if\([A-Za-z0-9_]+!=="disabled"&&[^;]+' "$CLI" | grep 
 
 ## 注意事项
 
-- **推荐使用环境变量方式**：设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 即可开启 auto 模式，无需补丁，跨版本通用
+- **推荐使用环境变量方式**：设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 或 `claude-opus-4-7` 等即可开启 auto 模式，无需补丁，跨版本通用
 - **补丁版本必须精确匹配**：每个版本的混淆变量名不同，不支持跨版本回退
-- **补丁跨平台不通用**：macOS 和 Linux 的 Bun 编译二进制混淆名不同（即使同版本号），需要分别提取模式
+- **补丁跨平台不通用**：各平台（Windows/macOS/Linux）的 Bun 编译二进制混淆名不同，即使同版本号也无法互用
 - **升级后需重新打补丁**：Claude Code 更新会替换文件，需重新运行脚本（环境变量方式不受此影响）
 - **auto 模式安全分类器仍生效**：仅解除入口限制，`classifyYoloAction` 仍会评估安全性
 
@@ -275,7 +280,7 @@ grep -oP '[A-Za-z0-9_]+=!1;if\([A-Za-z0-9_]+!=="disabled"&&[^;]+' "$CLI" | grep 
 <details>
 <summary>脚本显示 "SKIP" 或 "No patches applied"</summary>
 
-二进制可能已被补丁（运行 `--check` 查看），或版本不在支持列表中。推荐改用环境变量方式（设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514`），无需补丁。
+二进制可能已被补丁（运行 `--check` 查看），或版本不在支持列表中。推荐改用环境变量方式（设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 或 `claude-opus-4-7`），无需补丁。
 </details>
 
 <details>
@@ -293,7 +298,7 @@ node claude-buddy-patcher.mjs --restore
 
 设置环境变量手动指定：
 ```cmd
-set CLAUDE_BIN=C:\Users\你的用户名\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js
+set CLAUDE_BIN=C:\Users\你的用户名\.claude\bin\claude.exe
 node claude-auto-mode-patcher.mjs
 ```
 </details>
