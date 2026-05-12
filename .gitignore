@@ -1,1 +1,4 @@
 .claude/
+claude-2.1.138
+claude-*.bin
+*.auto-mode-backup
