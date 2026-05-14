@@ -357,6 +357,62 @@ const VERSION_PATCHES = {
       replace: 'r0("tengu_iron_gate_closed",!1,UZ6)',
     },
   ],
+  '2.1.141': [
+    {
+      id: 'provider-check',
+      desc: 'modelSupportsAutoMode — bypass provider check',
+      search:  'if(K!=="firstParty"&&K!=="anthropicAws")return!1',
+      replace: 'if(K!=="firstParty"&&K!=="anthropicAws")return!0',
+    },
+    {
+      id: 'model-allow-list',
+      desc: 'modelSupportsAutoMode — bypass model allow-list check (inner block)',
+      search:  'if(q.includes("claude-3-")||q==="claude-opus-4-0"||q==="claude-opus-4-1"||q==="claude-opus-4-5"||q==="claude-sonnet-4-0"||q==="claude-sonnet-4-5"||q==="claude-haiku-4-5")return!1',
+      replace: 'if(q.includes("claude-3-")||q==="claude-opus-4-0"||q==="claude-opus-4-1"||q==="claude-opus-4-5"||q==="claude-sonnet-4-0"||q==="claude-sonnet-4-5"||q==="claude-haiku-4-5")return!0',
+    },
+    {
+      id: 'model-rate-limit',
+      desc: 'modelSupportsAutoMode — bypass rate-limited model check',
+      search:  'if(CU()&&(q==="claude-opus-4-6"||q==="claude-sonnet-4-6"))return!1',
+      replace: 'if(CU()&&(q==="claude-opus-4-6"||q==="claude-sonnet-4-6"))return!0',
+    },
+    {
+      id: 'model-outer-return',
+      desc: 'modelSupportsAutoMode — outer return always true',
+      search:  'return!0}return!1}function FO$',
+      replace: 'return!0}return!0}function FO$',
+    },
+    {
+      id: 'gate-enabled',
+      desc: 'isAutoModeGateEnabled — always return true',
+      search:  'function fR(){if(ak?.isAutoModeCircuitBroken()??!1)return!1;if(mRq())return!1;if(!vmH(m7()))return!1;return!0}',
+      replace: 'function fR(){if(ak?.isAutoModeCircuitBroken()??!1)return!0;if(mRq())return!0;if(!vmH(m7()))return!0;return!0}',
+    },
+    {
+      id: 'circuit-broken',
+      desc: 'isAutoModeCircuitBroken — always return false',
+      search:  'function Nt1(){return ckH.circuitBroken}',
+      replace: 'function Nt1(){return !1               }',
+    },
+    {
+      id: 'can-enter',
+      desc: 'verifyAutoModeGateAccess — force canEnterAuto happy path',
+      search:  'if(M)return{updateContext:(Z)=>w(Z,Y)};let j;',
+      replace: 'if(1)return{updateContext:(Z)=>w(Z,Y)};let j;',
+    },
+    {
+      id: 'carousel',
+      desc: 'carouselAvailable — always true (enables Shift+Tab cycling)',
+      search:  'Y=!1;if($!=="disabled"&&!_&&z)Y=$==="enabled"||qoH()',
+      replace: 'Y=!0;if($!=="disabled"&&!_&&z)Y=$==="enabled"||qoH()',
+    },
+    {
+      id: 'classifier-unavailable',
+      desc: 'classifier unavailable — fail-open instead of fail-closed (allow when classifier service is down)',
+      search:  'RV("tengu_iron_gate_closed",!0,tGq)',
+      replace: 'RV("tengu_iron_gate_closed",!1,tGq)',
+    },
+  ],
   '2.1.138': [
     {
       id: 'provider-check',

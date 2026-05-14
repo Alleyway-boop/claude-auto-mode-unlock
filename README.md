@@ -70,6 +70,7 @@
 | v2.1.137 | Linux | 已验证 |
 | v2.1.138 | Linux | 已验证 |
 | v2.1.139 | Linux | 已验证 |
+| v2.1.141 | Windows (Bun) | 已验证 |
 
 **版本匹配策略**：精确匹配，不支持回退。每个版本的混淆变量名不同，补丁无法跨版本复用。不支持的版本会直接报错。
 
@@ -121,7 +122,7 @@ claude --permission-mode auto    # 启动时启用
 
 ### 原理
 
-Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件，JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改 7 个权限检查函数：
+Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件，JavaScript 源码以明文嵌入。本脚本通过**等长字节替换**修改权限检查函数（7 个基础 + 可选 classifier 补丁，v2.1.139+ 共 9 个）：
 
 | # | 目标 | 效果 |
 |---|------|------|
@@ -132,6 +133,7 @@ Claude Code 使用 [Bun](https://bun.sh/) 编译为独立二进制文件，JavaS
 | 5 | `isAutoModeCircuitBroken` | 始终返回 `false` |
 | 6 | `verifyAutoModeGateAccess` | 强制走 happy path |
 | 7 | `carouselAvailable` | 始终为 `true`（Shift+Tab 可切换） |
+| 8 | `classifier unavailable` | fail-open：分类器不可用时允许而非阻止（v2.1.137+） |
 
 > **v2.1.105 新增 `model-return` 补丁**：早期版本仅修改了 `modelSupportsAutoMode` 函数外层的 `return!1`，但内层的 `return/^claude-(opus|sonnet)-4-6/.test(K)` 会先执行并直接返回结果，导致外层修改永远不会生效。非 Claude 模型（如 glm-5.1）因此被误拒。新增的 `model-return` 补丁直接将内层正则返回替换为 `return!0`，从根源解决了此问题。
 
@@ -148,11 +150,13 @@ function oN(){if(C0?.isAutoModeCircuitBroken()??!1)return!1;...}
 function qL(){if(IV?.isAutoModeCircuitBroken()??!1)return!1;...}
 // v2.1.105
 function DL(){if(Lf?.isAutoModeCircuitBroken()??!1)return!1;...}
+// v2.1.141
+function fR(){if(ak?.isAutoModeCircuitBroken()??!1)return!1;...}
 ```
 
 > **注意**：v2.1.105 的 `circuit-broken` 补丁结构有变化，从 `return <variable>` 改为 `return <object>.circuitBroken`，补丁已适配。
 
-> **注意**：v2.1.139 的 `modelSupportsAutoMode` 函数结构大幅重构，不再使用正则匹配，改用 `$.includes("claude-3-")` + 多个 `||$===` 字符串比较来枚举模型。补丁策略相应调整为 3 个子补丁（`model-allow-list`、`model-rate-limit`、`model-outer-return`），共 9 个补丁点。
+> **注意**：v2.1.139+ 的 `modelSupportsAutoMode` 函数结构大幅重构，不再使用正则匹配，改用 `$.includes("claude-3-")` + 多个 `||$===` 字符串比较来枚举模型。补丁策略相应调整为 3 个子补丁（`model-allow-list`、`model-rate-limit`、`model-outer-return`），加上 `classifier-unavailable`（fail-open）共 9 个补丁点。v2.1.141 沿用相同结构。
 
 ---
 
@@ -235,35 +239,53 @@ node claude-auto-mode-patcher.mjs --restore
 ```bash
 # 设置目标文件路径
 CLI="node_modules/@anthropic-ai/claude-code/cli.js"  # Windows npm (旧版)
-# CLI="$(readlink -f ~/.local/bin/claude)"            # macOS
+# CLI="$(readlink -f ~/.local/bin/claude)"            # macOS/Linux
 
 # 1. provider 检查
 grep -oP 'if\([A-Za-z0-9_]+!=="firstParty"&&[A-Za-z0-9_]+!=="anthropicAws"\)return!1' "$CLI"
 
-# 2. model 正则（外层返回值）
+# 2. model 正则（外层返回值）— v2.1.137 及更早
 grep -oP 'claude-\(opus\|sonnet\)-4-6/\.test\([A-Za-z0-9_]+\)\}return!1\}' "$CLI"
 
-# 2.5 model 正则（内层返回值）— v2.1.105+ 新增
+# 2. model allow-list — v2.1.139+（新结构）
+grep -oP 'if\([A-Za-z0-9_]+\.includes\("claude-3-"\).*?\)return!1' "$CLI"
+
+# 2.5 model 正则（内层返回值）— v2.1.105~v2.1.137
 grep -oP 'return/\^claude-\(opus\|sonnet\)-4-6/\.test\([A-Za-z0-9_]+\)' "$CLI"
 
 # 3. gate 函数
 grep -oP 'function [a-zA-Z0-9_]+\(\)\{if\([a-zA-Z0-9_]+\?\.isAutoModeCircuitBroken\(\)\?\?!1\)return!1;if\([a-zA-Z0-9_]+\(\)\)return!1;if\(![a-zA-Z0-9_]+\([a-zA-Z0-9_]+\(\)\)\)return!1;return!0\}' "$CLI"
 
 # 4. circuit-broken 函数
-grep -oP 'isAutoModeCircuitBroken:\(\)=>[a-zA-Z0-9_]+' "$CLI"
-# 然后用输出的函数名搜索完整定义
-# grep -oP 'function FUNCNAME\(\)\{return [a-zA-Z0-9_]+\}' "$CLI"
+grep -oP 'function [A-Za-z0-9_]+\(\)\{return [A-Za-z0-9_]+\.circuitBroken\}' "$CLI"
 
 # 5. can-enter
 grep -oP 'if\([a-zA-Z0-9_]+\)return\{updateContext:\([^)]+\)=>[^}]+\};let [a-zA-Z0-9_]+;' "$CLI"
 
 # 6. carousel
 grep -oP '[A-Za-z0-9_]+=!1;if\([A-Za-z0-9_]+!=="disabled"&&[^;]+' "$CLI" | grep enabled
+
+# 7. classifier unavailable — v2.1.137+
+grep -oP '[A-Za-z0-9_]+\("tengu_iron_gate_closed",!0,[A-Za-z0-9_]+\)' "$CLI"
+
+# 8. model rate-limit — v2.1.139+
+grep -oP 'if\([A-Za-z0-9_]+\(\)&&\([A-Za-z0-9_]+==="claude-opus-4-6"\|\|[A-Za-z0-9_]+==="claude-sonnet-4-6"\)\)return!1' "$CLI"
 ```
+
+> **对于 Bun 编译二进制**（`~/.local/bin/claude` 或 `claude.exe`），`grep` 无法直接搜索。需用 Node.js 从二进制中提取字符串后再分析：
+> ```bash
+> node -e "
+> const fs = require('fs');
+> const buf = fs.readFileSync(process.argv[1]);
+> const str = buf.toString('latin1');
+> const idx = str.indexOf('firstParty');
+> if (idx > 0) console.log(str.substring(idx - 100, idx + 300));
+> " ~/.local/bin/claude
+> ```
 
 ## 注意事项
 
-- **推荐使用环境变量方式**：设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 或 `claude-opus-4-7` 等即可开启 auto 模式，无需补丁，跨版本通用
+- **推荐使用环境变量方式**：设置 `ANTHROPIC_MODEL=claude-sonnet-4-6-20250514` 或 `claude-opus-4-7` 等即可开启 auto 模式，无需补丁，跨版本通用（详见上方「无需补丁开启 Auto 模式」章节）
 - **补丁版本必须精确匹配**：每个版本的混淆变量名不同，不支持跨版本回退
 - **补丁跨平台不通用**：各平台（Windows/macOS/Linux）的 Bun 编译二进制混淆名不同，即使同版本号也无法互用
 - **升级后需重新打补丁**：Claude Code 更新会替换文件，需重新运行脚本（环境变量方式不受此影响）
@@ -298,7 +320,7 @@ node claude-buddy-patcher.mjs --restore
 
 设置环境变量手动指定：
 ```cmd
-set CLAUDE_BIN=C:\Users\你的用户名\.claude\bin\claude.exe
+set CLAUDE_BIN=%USERPROFILE%\.local\bin\claude.exe
 node claude-auto-mode-patcher.mjs
 ```
 </details>
