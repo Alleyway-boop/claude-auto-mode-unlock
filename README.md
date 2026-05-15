@@ -71,6 +71,7 @@
 | v2.1.138 | Linux | 已验证 |
 | v2.1.139 | Linux | 已验证 |
 | v2.1.141 | Windows (Bun) | 已验证 |
+| v2.1.142 | Windows (Bun) | 已验证 |
 
 **版本匹配策略**：精确匹配，不支持回退。每个版本的混淆变量名不同，补丁无法跨版本复用。不支持的版本会直接报错。
 
@@ -152,11 +153,13 @@ function qL(){if(IV?.isAutoModeCircuitBroken()??!1)return!1;...}
 function DL(){if(Lf?.isAutoModeCircuitBroken()??!1)return!1;...}
 // v2.1.141
 function fR(){if(ak?.isAutoModeCircuitBroken()??!1)return!1;...}
+// v2.1.142
+function KZ(){if(YN?.isAutoModeCircuitBroken()??!1)return!1;...}
 ```
 
 > **注意**：v2.1.105 的 `circuit-broken` 补丁结构有变化，从 `return <variable>` 改为 `return <object>.circuitBroken`，补丁已适配。
 
-> **注意**：v2.1.139+ 的 `modelSupportsAutoMode` 函数结构大幅重构，不再使用正则匹配，改用 `$.includes("claude-3-")` + 多个 `||$===` 字符串比较来枚举模型。补丁策略相应调整为 3 个子补丁（`model-allow-list`、`model-rate-limit`、`model-outer-return`），加上 `classifier-unavailable`（fail-open）共 9 个补丁点。v2.1.141 沿用相同结构。
+> **注意**：v2.1.139+ 的 `modelSupportsAutoMode` 函数结构大幅重构，不再使用正则匹配，改用 `$.includes("claude-3-")` + 多个 `||$===` 字符串比较来枚举模型。补丁策略相应调整为 3 个子补丁（`model-allow-list`、`model-rate-limit`、`model-outer-return`），加上 `classifier-unavailable`（fail-open）共 9 个补丁点。v2.1.141~v2.1.142 沿用相同结构。
 
 ---
 
